@@ -39,6 +39,28 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/products/:id', async (req, res) => {
+  try {
+    const id = req.params.id; // Frontend theke asha ID
+    
+    // ID jodi MongoDB format-e na hoy, tahole error prevent korbe
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid ID format" });
+    }
+
+    const query = { _id: new ObjectId(id) }; // MongoDB query format
+    const result = await productCollection.findOne(query);
+
+    if (!result) {
+      return res.status(404).send({ message: "Product not found" });
+    }
+
+    res.send(result); // Milse! Ekhon data pathiye daw
+  } catch (error) {
+    res.status(500).send({ message: "Server error" });
+  }
+});
+
     // ADD PRODUCT
     app.post('/products', async (req, res) => {
       try {
@@ -109,37 +131,92 @@ async function run() {
 // Backend (Express.js) logic
 app.post('/api/checkout', async (req, res) => {
   try {
-    const { cart, totalAmount } = req.body;
+    const { cart, totalAmount, invoiceNo, customerName, customerPhone } = req.body;
 
     if (!cart || cart.length === 0) {
       return res.status(400).send({ message: "Cart is empty" });
     }
 
-    // Protita product-er stock update korar jonno loop
-    const updatePromises = cart.map(async (item) => {
-      return productCollection.updateOne(
-        { _id: new ObjectId(item._id) }, // _id ke ObjectId-te convert kora MUST
-        { $inc: { stock: -item.quantity } } // Stock quantity onujayi kombe
-      );
-    });
+    // ✅ Stock update (Bulk Write)
+    const bulkOps = cart.map(item => ({
+      updateOne: {
+        filter: { _id: new ObjectId(item._id) },
+        update: { $inc: { stock: -item.quantity } }
+      }
+    }));
+    await productCollection.bulkWrite(bulkOps);
 
-    await Promise.all(updatePromises);
-
-    // Sale record save kora (Optional: Jate dashboard-e revenue dekha jay)
+    // ✅ SALE RECORD SAVE (Eita comment out chilo, ekhon save hobe)
     const saleRecord = {
-      items: cart,
-      totalAmount: totalAmount,
-      date: new Date(),
+      invoiceNo,
+      customerName: customerName || "Walk-in Guest",
+      customerPhone: customerPhone || "N/A",
+      cart: cart, // Eikhaney full item list thakbe
+      totalAmount,
+      date: new Date(), // Real time date
     };
-    // await salesCollection.insertOne(saleRecord); 
 
-    res.status(200).send({ success: true, message: "Checkout Done & Stock Updated!" });
+    // Sales collection-e insert kora
+    const salesCollection = database.collection("sales");
+    const result = await salesCollection.insertOne(saleRecord);
+
+    res.status(200).send({ success: true, message: "Sale Recorded!", result });
   } catch (error) {
-    console.error("Checkout Error Backend:", error);
+    console.error("Checkout Error:", error);
     res.status(500).send({ success: false, error: error.message });
   }
 });
 
+// 2. GET ALL SALES - Admin er table-e dekhano jonno
+app.get('/all-sales', async (req, res) => {
+  try {
+    const salesCollection = database.collection("sales");
+    // Shobcheye notun sale-ta agey dekhabe (sort by date)
+    const result = await salesCollection.find().sort({ date: -1 }).toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Error fetching sales" });
+  }
+});
+
+
+//==================Admin======================
+app.get('/admin-stats', async (req, res) => {
+  const sales = await database.collection("sales").find().toArray();
+  
+  const today = new Date().toLocaleDateString();
+
+  const totalIncome = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+  const totalSales = sales.length;
+
+  const todaySalesArr = sales.filter(sale => new Date(sale.date).toLocaleDateString() === today);
+  const todayIncome = todaySalesArr.reduce((sum, sale) => sum + sale.totalAmount, 0);
+  const todaySalesCount = todaySalesArr.length;
+
+  // 🔥 FIX: Grouping sales by date for the last 7 days
+  const last7DaysData = {};
+  
+  // Last 7 days er empty structure banay fela jate data na thakleo bar thake
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short' });
+    last7DaysData[dateStr] = { name: dateStr, amount: 0, count: 0 };
+  }
+
+  // Sales theke data niye date wise sum kora
+  sales.forEach(sale => {
+    const saleDate = new Date(sale.date).toLocaleDateString('en-US', { weekday: 'short' });
+    if (last7DaysData[saleDate]) {
+      last7DaysData[saleDate].amount += sale.totalAmount;
+      last7DaysData[saleDate].count += 1;
+    }
+  });
+
+  const graphData = Object.values(last7DaysData);
+
+  res.send({ totalIncome, totalSales, todayIncome, todaySalesCount, graphData });
+});
 
 
     // ================= USERS =================
