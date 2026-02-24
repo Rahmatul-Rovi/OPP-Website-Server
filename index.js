@@ -102,6 +102,46 @@ async function run() {
       }
     });
 
+
+    // Sales Schema (Mongoose) - Jodi thake, na thakle eita follow koro
+// { items: Array, totalAmount: Number, date: Date }
+
+// Backend (Express.js) logic
+app.post('/api/checkout', async (req, res) => {
+  try {
+    const { cart, totalAmount } = req.body;
+
+    if (!cart || cart.length === 0) {
+      return res.status(400).send({ message: "Cart is empty" });
+    }
+
+    // Protita product-er stock update korar jonno loop
+    const updatePromises = cart.map(async (item) => {
+      return productCollection.updateOne(
+        { _id: new ObjectId(item._id) }, // _id ke ObjectId-te convert kora MUST
+        { $inc: { stock: -item.quantity } } // Stock quantity onujayi kombe
+      );
+    });
+
+    await Promise.all(updatePromises);
+
+    // Sale record save kora (Optional: Jate dashboard-e revenue dekha jay)
+    const saleRecord = {
+      items: cart,
+      totalAmount: totalAmount,
+      date: new Date(),
+    };
+    // await salesCollection.insertOne(saleRecord); 
+
+    res.status(200).send({ success: true, message: "Checkout Done & Stock Updated!" });
+  } catch (error) {
+    console.error("Checkout Error Backend:", error);
+    res.status(500).send({ success: false, error: error.message });
+  }
+});
+
+
+
     // ================= USERS =================
 
     app.post('/users', async (req, res) => {
