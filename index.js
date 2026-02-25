@@ -218,34 +218,46 @@ app.get('/admin-stats', async (req, res) => {
   res.send({ totalIncome, totalSales, todayIncome, todaySalesCount, graphData });
 });
 
+app.get('/users/admin/:email', async (req, res) => {
+  const email = req.params.email;
+  const user = await userCollection.findOne({ email });
+  res.send({ admin: user?.role === 'admin' });
+});
 
     // ================= USERS =================
 
-    app.post('/users', async (req, res) => {
-      const user = req.body;
-      const existingUser = await userCollection.findOne({ email: user.email });
-
-      if (existingUser) {
-        return res.send({ message: 'User already exists' });
-      }
-
-      const result = await userCollection.insertOne(user);
-      res.send(result);
-    });
+   // ✅ User database-e add ba update kora (Upsert)
+app.post('/users', async (req, res) => {
+  const user = req.body;
+  const query = { email: user.email };
+  const updateDoc = {
+    $set: {
+      name: user.name,
+      email: user.email,
+      role: user.role || 'user',
+      lastLogin: new Date()
+    }
+  };
+  const options = { upsert: true };
+  const result = await userCollection.updateOne(query, updateDoc, options);
+  res.send(result);
+});
 
     app.get('/users', async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
-    app.patch('/users/admin/:id', async (req, res) => {
-      const id = req.params.id;
-      const result = await userCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { role: 'admin' } }
-      );
-      res.send(result);
-    });
+   // ✅ Role 'user' theke 'admin' kora
+app.patch('/users/admin/:id', async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: { role: 'admin' }
+  };
+  const result = await userCollection.updateOne(filter, updateDoc);
+  res.send(result);
+});
 
   } catch (error) {
     console.error("Connection error:", error);
