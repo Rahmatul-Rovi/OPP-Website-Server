@@ -41,9 +41,8 @@ async function run() {
 
     app.get('/products/:id', async (req, res) => {
   try {
-    const id = req.params.id; // Frontend theke asha ID
+    const id = req.params.id; 
     
-    // ID jodi MongoDB format-e na hoy, tahole error prevent korbe
     if (!ObjectId.isValid(id)) {
         return res.status(400).send({ message: "Invalid ID format" });
     }
@@ -55,7 +54,7 @@ async function run() {
       return res.status(404).send({ message: "Product not found" });
     }
 
-    res.send(result); // Milse! Ekhon data pathiye daw
+    res.send(result); 
   } catch (error) {
     res.status(500).send({ message: "Server error" });
   }
@@ -71,8 +70,8 @@ async function run() {
           image: product.image || "",
           category: product.category || "General",
           description: product.description || "",
-          price: Number(product.price) || 0,   // ✅ SAFE NUMBER
-          stock: Number(product.stock) || 0,   // ✅ SAFE NUMBER
+          price: Number(product.price) || 0, 
+          stock: Number(product.stock) || 0,  
           discount: 0,
           createdAt: new Date()
         };
@@ -125,7 +124,6 @@ async function run() {
     });
 
 
-    // Sales Schema (Mongoose) - Jodi thake, na thakle eita follow koro
 // { items: Array, totalAmount: Number, date: Date }
 
 // Backend (Express.js) logic
@@ -137,7 +135,7 @@ app.post('/api/checkout', async (req, res) => {
       return res.status(400).send({ message: "Cart is empty" });
     }
 
-    // ✅ Stock update (Bulk Write)
+    //  Stock update (Bulk Write)
     const bulkOps = cart.map(item => ({
       updateOne: {
         filter: { _id: new ObjectId(item._id) },
@@ -146,17 +144,17 @@ app.post('/api/checkout', async (req, res) => {
     }));
     await productCollection.bulkWrite(bulkOps);
 
-    // ✅ SALE RECORD SAVE (Eita comment out chilo, ekhon save hobe)
+    //  SALE RECORD SAVE
     const saleRecord = {
       invoiceNo,
       customerName: customerName || "Walk-in Guest",
       customerPhone: customerPhone || "N/A",
-      cart: cart, // Eikhaney full item list thakbe
+      cart: cart,
       totalAmount,
       date: new Date(), // Real time date
     };
 
-    // Sales collection-e insert kora
+    // Sales collection insert
     const salesCollection = database.collection("sales");
     const result = await salesCollection.insertOne(saleRecord);
 
