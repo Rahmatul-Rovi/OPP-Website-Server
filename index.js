@@ -165,11 +165,10 @@ app.post('/api/checkout', async (req, res) => {
   }
 });
 
-// 2. GET ALL SALES - Admin er table-e dekhano jonno
+// 2. GET ALL SALES - Admin table
 app.get('/all-sales', async (req, res) => {
   try {
     const salesCollection = database.collection("sales");
-    // Shobcheye notun sale-ta agey dekhabe (sort by date)
     const result = await salesCollection.find().sort({ date: -1 }).toArray();
     res.send(result);
   } catch (error) {
@@ -191,10 +190,9 @@ app.get('/admin-stats', async (req, res) => {
   const todayIncome = todaySalesArr.reduce((sum, sale) => sum + sale.totalAmount, 0);
   const todaySalesCount = todaySalesArr.length;
 
-  // 🔥 FIX: Grouping sales by date for the last 7 days
+  // FIX: Grouping sales by date for the last 7 days
   const last7DaysData = {};
   
-  // Last 7 days er empty structure banay fela jate data na thakleo bar thake
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -202,7 +200,7 @@ app.get('/admin-stats', async (req, res) => {
     last7DaysData[dateStr] = { name: dateStr, amount: 0, count: 0 };
   }
 
-  // Sales theke data niye date wise sum kora
+  // Sales data sum
   sales.forEach(sale => {
     const saleDate = new Date(sale.date).toLocaleDateString('en-US', { weekday: 'short' });
     if (last7DaysData[saleDate]) {
@@ -224,7 +222,7 @@ app.get('/users/admin/:email', async (req, res) => {
 
     // ================= USERS =================
 
-   // ✅ User database-e add ba update kora (Upsert)
+   // User database-e add
 app.post('/users', async (req, res) => {
   const user = req.body;
   const query = { email: user.email };
@@ -246,7 +244,7 @@ app.post('/users', async (req, res) => {
       res.send(result);
     });
 
-   // ✅ Role 'user' theke 'admin' kora
+   // Role 'user' to 'admin'
 app.patch('/users/admin/:id', async (req, res) => {
   const id = req.params.id;
   const filter = { _id: new ObjectId(id) };
